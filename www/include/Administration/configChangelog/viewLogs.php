@@ -43,7 +43,7 @@ function searchUserName($user_name)
 {
     global $pearDB;
     $str = "";
-  
+
     $DBRES = $pearDB->query("SELECT contact_id FROM contact WHERE contact_name LIKE '%".$user_name."%' OR contact_alias LIKE '%".$user_name."%'");
     while ($row = $DBRES->fetchRow()) {
         if ($str != "") {
@@ -321,8 +321,8 @@ $tpl->assign('event_type', _("Event Type"));
 $tpl->assign('time', _("Time"));
 $tpl->assign('contact', _("Contact"));
 
-/* 
- * Pagination 
+/*
+ * Pagination
  */
 $tpl->assign('limit', $limit);
 $tpl->assign('rows', $rows);
@@ -338,13 +338,14 @@ if (isset($_POST['searchO']) || isset($_POST['searchU']) || isset($_POST['otype'
     $listAction = $centreon->CentreonLogAction->listAction($_GET['object_id'], $_GET['object_type']);
     $listModification = array();
     $listModification = $centreon->CentreonLogAction->listModification($_GET['object_id'], $_GET['object_type']);
-  
+
     if (isset($listAction)) {
         $tpl->assign("action", $listAction);
+        $tpl->assign("object_name", $listAction[0]["object_name"]);
     }
     if (isset($listModification)) {
         $tpl->assign("modification", $listModification);
     }
-  
+
     $tpl->display("viewLogsDetails.ihtml");
 }

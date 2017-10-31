@@ -6,67 +6,58 @@
         </td>
     </tr>
 </table>
-<table class="ListTable">
+<table class="ListTable broker_stats_cntr">
     <tr class="ListHeader">
-        <td class="ListColHeaderCenter" style="white-space:nowrap;">Changes for ...</td>           
+        <td class="ListColHeaderCenter">Changes for {$object_name}</td>
     </tr>
-    {assign var='classStyle' value='list_two'}
-    {assign var='firstFlag' value=1}
-    {foreach item=list from=$action}
-        {if $classStyle == 'list_two'}
-            {assign var='classStyle' value='list_one'}
-        {else}
-            {assign var='classStyle' value='list_two'}
-        {/if}
-        <tr>
-            <td>{$list.action_type} by {$list.log_contact_id} at {$list.action_log_date}</td>
-        </tr>
-        <tr class={$classStyle}>
-            <td class="ListColCenter">
-            {if $list.action_type == "Create" || $list.action_type == "Change" || $list.action_type == "Massive change"}
-                <table class="ListTable"
-                        {if $firstFlag}
-                        {assign var='firstFlag' value=0}
-                        <tr class="ListHeader">
-                            <td class="ListColHeaderCenter" style="white-space:nowrap;">{$field_name}</td>
-                            <td class="ListColHeaderCenter" style="white-space:nowrap;">{$before}</td>
-                            <td class="ListColHeaderCenter" style="white-space:nowrap;">{$after}</td>
-                        </tr>
+    <tr>
+        <td style="vertical-align: top;">
+        {foreach item=list from=$action}
+            {assign var='cpt' value=0}
+            {foreach item=modif from=$modification}
+                {if $modif.action_log_id == $list.action_log_id}
+                    {assign var='cpt' value=$cpt+1}
+                {/if}
+            {/foreach}
+            {if ($list.action_type == "Create" || $list.action_type == "Change" || $list.action_type == "Massive change") && $cpt > 0}
+            <div class="broker_stats {$list.action_log_id}">
+                <p class="title {$list.action_log_id}" onclick="toggleInfoBlock('{$list.action_log_id}')">
+                    <span class="expand" ></span>{$list.action_type} by {$list.log_contact_id} at {$list.action_log_date}
+                </p>
+                <div class="informations_header" id="{$list.action_log_id}">
+                    {foreach item=modif from=$modification}
+                        {if $modif.action_log_id == $list.action_log_id}
+                        <div class="informations">
+                            <p class="info_name">{$modif.field_name}</p>
+                            <p class="info_value">{$modif.field_value_after}</p>
+                            <i class="info_value" style="color:grey;">{$modif.field_value_before}</i>
+                        </div>
                         {/if}
-                        {assign var='cpt' value=0}                      
-                        {foreach item=modif from=$modification}
-                            {if $modif.action_log_id == $list.action_log_id}
-                            <tr>
-                                <td class="ListColCenter" width="250">
-                                    {if $modif.action_log_id == $list.action_log_id}
-                                        {$modif.field_name}
-                                    {/if}
-                                </td>
-                                <td class="ListColCenter" width="200">
-                                    {if $modif.action_log_id == $list.action_log_id}
-                                        {$modif.field_value_before}
-                                    {/if}
-                                </td>
-                                <td class="ListColCenter" width="200">
-                                    {if $modif.action_log_id == $list.action_log_id}
-                                        {$modif.field_value_after}
-                                    {/if}
-                                </td>
-                            </tr>
-                            {assign var='cpt' value=$cpt+1}
-                            {/if}
-                        {/foreach}
-                        {if $cpt == 0}
-                            <tr>
-                                <td colspan="3">{$noModifLabel}</td>
-                            </tr>
-                        {/if}
-                </table>                
-            {/if}       
-            </td>
-        </tr>
-    {/foreach}
+                    {/foreach}
+                </div>
+            </div>
+            {else}
+            <div class="broker_stats {$list.action_log_id}">
+                <p class="title {$list.action_log_id}" onclick="toggleInfoBlock('{$list.action_log_id}')"><span class="expand-icon">
+                    </span>{$list.action_type} by {$list.log_contact_id} at {$list.action_log_date}
+                </p>
+            </div>
+            {/if}
+        {/foreach}
+    </td>
+    </tr>
 </table>
+{literal}
+<script type="text/javascript">
+    function toggleInfoBlock(id) {
+        var elem = jQuery('#' + id);
+        elem.slideToggle( function() {
+            expand = jQuery('.title.' + id + ' .expand');
+            expand.toggleClass('expand-icon');
+        });
+    }
+</script>
+{/literal}
+
 {$form.hidden}
 </form>
-<br>
