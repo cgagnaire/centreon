@@ -199,10 +199,10 @@ while ($res = $DBRESULT->fetchRow()) {
     if ($res['object_id']) {
         $objectName = str_replace(array('#S#', '#BS#'), array("/", "\\"), $res["object_name"]);
 
-        if ($res['object_type'] == "service") {
+/*        if ($res['object_type'] == "service") {
             $tmp = $centreon->CentreonLogAction->getHostId($res['object_id']);
             if ($tmp != -1) {
-                if (isset($tmp['h'])) {
+                if (isset($tmp['h']) && $tmp['h'] != "Save") {
                     $tmp2 = $centreon->CentreonLogAction->getHostId($res['object_id']);
                     $tabHost = split(',', $tmp2["h"]);
                     if (count($tabHost) == 1) {
@@ -286,7 +286,7 @@ while ($res = $DBRESULT->fetchRow()) {
             unset($hg_name);
             unset($hosts);
             unset($hostgroups);
-        } else {
+        } else { */
             $elemArray[] = array(
                 "date" => date('Y/m/d H:i:s', $res['action_log_date']),
                 "type" => $res['object_type'],
@@ -298,7 +298,7 @@ while ($res = $DBRESULT->fetchRow()) {
                 "change" => $tabAction[$res['action_type']],
                 "badge" => $badge[$tabAction[$res['action_type']]]
             );
-        }
+        //}
     }
 }
 
@@ -345,6 +345,6 @@ if (isset($_POST['searchO']) || isset($_POST['searchU']) || isset($_POST['otype'
     if (isset($listModification)) {
         $tpl->assign("modification", $listModification);
     }
-  
+    
     $tpl->display("viewLogsDetails.ihtml");
 }

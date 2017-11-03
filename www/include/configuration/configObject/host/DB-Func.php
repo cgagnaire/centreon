@@ -270,8 +270,7 @@ function deleteHostInDB($hosts = array())
         $rq = "SELECT @nbr := (SELECT COUNT( * ) FROM host_service_relation WHERE service_service_id = hsr.service_service_id GROUP BY service_service_id) AS nbr, hsr.service_service_id FROM host_service_relation hsr, host WHERE hsr.host_host_id = '" . intval($key) . "' AND host.host_id = hsr.host_host_id AND host.host_register = '1'";
         $DBRESULT = $pearDB->query($rq);
 
-        $DBRESULT3 = $pearDB->query("SELECT host_name FROM `host` WHERE `host_id` = '" . intval($key) . "' LIMIT 1");
-        $hostname = $DBRESULT3->fetchRow();
+        $hostname = getMyHostName(intval($key));
 
         while ($row = $DBRESULT->fetchRow()) {
             if ($row["nbr"] == 1) {
@@ -279,7 +278,7 @@ function deleteHostInDB($hosts = array())
                 $svcname = $DBRESULT4->fetchRow();
 
                 $DBRESULT2 = $pearDB->query("DELETE FROM service WHERE service_id = '" . $row["service_service_id"] . "'");
-                $centreon->CentreonLogAction->insertLog("service", $row["service_service_id"], $hostname['host_name'] . "/" . $svcname["service_description"], "d");
+                $centreon->CentreonLogAction->insertLog("service", $row["service_service_id"], $hostname." / ".$svcname["service_description"], "d");
             }
         }
         $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $key, "action" => "DELETE"));
@@ -287,7 +286,7 @@ function deleteHostInDB($hosts = array())
         $DBRESULT = $pearDB->query("DELETE FROM host_template_relation WHERE host_host_id = '" . intval($key) . "'");
         $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_host WHERE host_host_id = '" . intval($key) . "'");
         $DBRESULT = $pearDB->query("DELETE FROM contact_host_relation WHERE host_host_id = '" . intval($key) . "'");
-        $centreon->CentreonLogAction->insertLog("host", $key, $hostname['host_name'], "d");
+        $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "d");
     }
 }
 

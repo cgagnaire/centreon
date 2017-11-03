@@ -262,11 +262,8 @@ function testServiceExistence($name = null, $hPars = array(), $hgPars = array(),
             $hgPars = array();
         }
     }
-
-    $escapeName = CentreonDB::escape($centreon->checkIllegalChar($name));
-
     foreach ($hPars as $host) {
-        $DBRESULT = $pearDB->query("SELECT service_id FROM service, host_service_relation hsr WHERE hsr.host_host_id = '".$host."' AND hsr.service_service_id = service_id AND service.service_description = '" . $escapeName . "'");
+        $DBRESULT = $pearDB->query("SELECT service_id FROM service, host_service_relation hsr WHERE hsr.host_host_id = '".$host."' AND hsr.service_service_id = service_id AND service.service_description = '".CentreonDB::escape($centreon->checkIllegalChar($name))."'");
         $service = $DBRESULT->fetchRow();
         #Duplicate entry
         if ($DBRESULT->numRows() >= 1 && $service["service_id"] != $id) {
@@ -275,7 +272,7 @@ function testServiceExistence($name = null, $hPars = array(), $hgPars = array(),
         $DBRESULT->free();
     }
     foreach ($hgPars as $hostgroup) {
-        $DBRESULT = $pearDB->query("SELECT service_id FROM service, host_service_relation hsr WHERE hsr.hostgroup_hg_id = '".$hostgroup."' AND hsr.service_service_id = service_id AND service.service_description = '" . $escapeName . "'");
+        $DBRESULT = $pearDB->query("SELECT service_id FROM service, host_service_relation hsr WHERE hsr.hostgroup_hg_id = '".$hostgroup."' AND hsr.service_service_id = service_id AND service.service_description = '".CentreonDB::escape($centreon->checkIllegalChar($name))."'");
         $service = $DBRESULT->fetchRow();
         #Duplicate entry
         if ($DBRESULT->numRows() >= 1 && $service["service_id"] != $id) {
@@ -313,9 +310,14 @@ function enableServiceInDB($service_id = null, $service_arr = array())
     }
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '1' WHERE service_id = '".$key."'");
-        $DBRESULT2 = $pearDB->query("SELECT service_description FROM `service` WHERE service_id = '".$key."' LIMIT 1");
-        $row = $DBRESULT2->fetchRow();
-        $centreon->CentreonLogAction->insertLog("service", $key, $row['service_description'], "enable");
+	$serviceDescription = getMyServiceName($key);
+	$hostId = getMyHostServiceID($key);
+        $hostname = getMyHostName($hostId);
+	if (isAServiceTpl($key)) {
+	    $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "enable");
+	} else {
+	    $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "enable");
+	}
     }
 }
 
@@ -330,9 +332,14 @@ function disableServiceInDB($service_id = null, $service_arr = array())
     }
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '0' WHERE service_id = '".$key."'");
-        $DBRESULT2 = $pearDB->query("SELECT service_description FROM `service` WHERE service_id = '".$key."' LIMIT 1");
-        $row = $DBRESULT2->fetchRow();
-        $centreon->CentreonLogAction->insertLog("service", $key, $row['service_description'], "disable");
+        $serviceDescription = getMyServiceName($key);
+        $hostId = getMyHostServiceID($key);
+        $hostname = getMyHostName($hostId);
+        if (isAServiceTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "disable");
+        } else {
+            $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "disable");
+        }
     }
 }
 
@@ -345,14 +352,20 @@ function deleteServiceInDB($services = array())
         while ($row = $DBRESULT->fetchRow()) {
             $DBRESULT2 = $pearDB->query("UPDATE service SET service_template_model_stm_id = NULL WHERE service_id = '".$row["service_id"]."'");
         }
-        $DBRESULT3 = $pearDB->query("SELECT service_description FROM `service` WHERE `service_id` = '".$key."' LIMIT 1");
-        $svcname = $DBRESULT3->fetchRow();
-        $centreon->CentreonLogAction->insertLog("service", $key, $svcname['service_description'], "d");
+        $serviceDescription = getMyServiceName($key);
+        $hostId = getMyHostServiceID($key);
+        $hostname = getMyHostName($hostId);
+	    if (isAServiceTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "d");
+        } else {
+            $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "d");
+        }
         $DBRESULT = $pearDB->query("DELETE FROM service WHERE service_id = '".$key."'");
         $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_service WHERE svc_svc_id = '".$key."'");
         $DBRESULT = $pearDB->query("DELETE FROM contact_service_relation WHERE service_service_id = '".$key."'");
+
+	    $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $key, "action" => "DELETE"));
     }
-    $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $key, "action" => "DELETE"));
 }
 
 function divideGroupedServiceInDB($service_id = null, $service_arr = array(), $toHost = null)
@@ -498,6 +511,7 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
                         if ($host) {
                             $pearDB->query("INSERT INTO host_service_relation VALUES ('', NULL, '".$host."', NULL, '".$maxId["MAX(service_id)"]."')");
                             setHostChangeFlag($pearDB, $host, null);
+                            $fields["service_hPars"] = $host;
                         } elseif ($hostgroup) {
                             $pearDB->query("INSERT INTO host_service_relation VALUES ('', '".$hostgroup."', NULL, NULL, '".$maxId["MAX(service_id)"]."')");
                             setHostChangeFlag($pearDB, null, $hostgroup);
@@ -627,12 +641,15 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
                         /*
                          *  get svc desc
                          */
-                        $query = "SELECT service_description FROM service WHERE service_id = '".$maxId["MAX(service_id)"]."' LIMIT 1";
-                        $DBRES = $pearDB->query($query);
-                        if ($DBRES->numRows()) {
-                            $row2 = $DBRES->fetchRow();
-                            $description = $row2['service_description'];
-                            $centreon->CentreonLogAction->insertLog("service", $maxId["MAX(service_id)"], $description, "a", $fields);
+			            $serviceDescription = getMyServiceName($maxId["MAX(service_id)"]);
+                        $hostId = getMyHostServiceID($maxId["MAX(service_id)"]);
+                        $hostname = getMyHostName($hostId);
+                        if (isAServiceTpl($key)) {
+			                $fields["service_host_template"] = $hostname;
+                            $centreon->CentreonLogAction->insertLog("service template", $maxId["MAX(service_id)"], $serviceDescription, "a", $fields);
+                        } else {
+			                $fields["service_hostname"] = $hostname;
+                            $centreon->CentreonLogAction->insertLog("service", $maxId["MAX(service_id)"], $hostname." / ".$serviceDescription, "a", $fields);
                         }
                     }
                 }
@@ -645,7 +662,7 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
 
 function updateServiceInDB($service_id = null, $from_MC = false, $params = array())
 {
-    global $form;
+    global $form, $centreon;
 
     if (!$service_id) {
         return;
@@ -778,14 +795,33 @@ function updateServiceInDB($service_id = null, $from_MC = false, $params = array
     } else {
         updateServiceCategories($service_id);
     }
+
+    $fields = CentreonLogAction::prepareChanges($ret);
+
+    $modificationType = "c";
+    if ($from_MC) {
+	    $modificationType = "mc";
+    }
+
+    $serviceDescription = getMyServiceName($service_id);
+    $hostId = getMyHostServiceID($service_id);
+    $hostname = getMyHostName($hostId);
+    if (isAServiceTpl($service_id)) {
+        $fields["service_host_template"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service template", $service_id, $serviceDescription, $modificationType, $fields);
+    } else {
+        $fields["service_hostname"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service", $service_id, $hostname." / ".$serviceDescription, $modificationType, $fields);;
+    }
 }
 
 function insertServiceInDB($ret = array(), $macro_on_demand = null)
 {
     global $centreon;
 
-    $tmp_fields = insertService($ret, $macro_on_demand);
-    $service_id = $tmp_fields['service_id'];
+    $return = insertService($ret, $macro_on_demand);
+    $service_id = $return['service_id'];
+    $fields = $return['fields'];
     updateServiceContactGroup($service_id, $ret);
     updateServiceContact($service_id, $ret);
     updateServiceNotifs($service_id, $ret);
@@ -798,6 +834,18 @@ function insertServiceInDB($ret = array(), $macro_on_demand = null)
     updateServiceTrap($service_id, $ret);
     updateServiceCategories($service_id, $ret);
     $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $service_id, "action" => "ADD"));
+
+    $serviceDescription = getMyServiceName($service_id);
+    $hostId = getMyHostServiceID($service_id);
+    $hostname = getMyHostName($hostId);
+    if (isAServiceTpl($service_id)) {
+        $fields["service_host_template"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service template", $service_id, $serviceDescription, "a", $fields);
+    } else {
+        $fields["service_hostname"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service", $service_id, $hostname." / ".$serviceDescription, "a", $fields);;
+    }
+
     return ($service_id);
 }
 
@@ -922,10 +970,6 @@ function insertService($ret = array(), $macro_on_demand = null)
     if (isset($ret['criticality_id'])) {
         setServiceCriticality($service_id['MAX(service_id)'], $ret['criticality_id']);
     }
-
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("service", $service_id["MAX(service_id)"], CentreonDB::escape($ret["service_description"]), "a", $fields);
 
     return (array("service_id" => $service_id["MAX(service_id)"], "fields" => $fields));
 }
@@ -1105,10 +1149,6 @@ function updateService($service_id = null, $from_MC = false, $params = array())
     }
 
     $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $service_id, "action" => "UPDATE"));
-
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("service", $service_id, CentreonDB::escape($ret["service_description"]), "c", $fields);
 }
 
 function updateService_MC($service_id = null, $params = array())
@@ -1278,10 +1318,6 @@ function updateService_MC($service_id = null, $params = array())
     if (isset($ret['criticality_id']) && $ret['criticality_id']) {
         setServiceCriticality($service_id, $ret['criticality_id']);
     }
-
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("service", $service_id, CentreonDB::escape($ret["service_description"]), "mc", $fields);
 }
 
 /*
