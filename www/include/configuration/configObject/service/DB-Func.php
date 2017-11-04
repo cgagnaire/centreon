@@ -310,14 +310,14 @@ function enableServiceInDB($service_id = null, $service_arr = array())
     }
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '1' WHERE service_id = '".$key."'");
-	$serviceDescription = getMyServiceName($key);
-	$hostId = getMyHostServiceID($key);
-        $hostname = getMyHostName($hostId);
-	if (isAServiceTpl($key)) {
-	    $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "enable");
-	} else {
-	    $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "enable");
-	}
+        $serviceDescription = getMyServiceName($key);
+        // $hostId = getMyHostServiceID($key);
+        // $hostname = getMyHostName($hostId);
+        if (isAServiceTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "enable");
+        } else {
+            $centreon->CentreonLogAction->insertLog("service", $key, $serviceDescription, "enable");
+        }
     }
 }
 
@@ -333,12 +333,12 @@ function disableServiceInDB($service_id = null, $service_arr = array())
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '0' WHERE service_id = '".$key."'");
         $serviceDescription = getMyServiceName($key);
-        $hostId = getMyHostServiceID($key);
-        $hostname = getMyHostName($hostId);
+        // $hostId = getMyHostServiceID($key);
+        // $hostname = getMyHostName($hostId);
         if (isAServiceTpl($key)) {
             $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "disable");
         } else {
-            $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "disable");
+            $centreon->CentreonLogAction->insertLog("service", $key, $serviceDescription, "disable");
         }
     }
 }
@@ -353,12 +353,12 @@ function deleteServiceInDB($services = array())
             $DBRESULT2 = $pearDB->query("UPDATE service SET service_template_model_stm_id = NULL WHERE service_id = '".$row["service_id"]."'");
         }
         $serviceDescription = getMyServiceName($key);
-        $hostId = getMyHostServiceID($key);
-        $hostname = getMyHostName($hostId);
+        // $hostId = getMyHostServiceID($key);
+        // $hostname = getMyHostName($hostId);
 	    if (isAServiceTpl($key)) {
             $centreon->CentreonLogAction->insertLog("service template", $key, $serviceDescription, "d");
         } else {
-            $centreon->CentreonLogAction->insertLog("service", $key, $hostname." / ".$serviceDescription, "d");
+            $centreon->CentreonLogAction->insertLog("service", $key, $serviceDescription, "d");
         }
         $DBRESULT = $pearDB->query("DELETE FROM service WHERE service_id = '".$key."'");
         $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_service WHERE svc_svc_id = '".$key."'");
@@ -642,14 +642,14 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
                          *  get svc desc
                          */
 			            $serviceDescription = getMyServiceName($maxId["MAX(service_id)"]);
-                        $hostId = getMyHostServiceID($maxId["MAX(service_id)"]);
-                        $hostname = getMyHostName($hostId);
+                        // $hostId = getMyHostServiceID($maxId["MAX(service_id)"]);
+                        // $hostname = getMyHostName($hostId);
                         if (isAServiceTpl($key)) {
 			                $fields["service_host_template"] = $hostname;
                             $centreon->CentreonLogAction->insertLog("service template", $maxId["MAX(service_id)"], $serviceDescription, "a", $fields);
                         } else {
 			                $fields["service_hostname"] = $hostname;
-                            $centreon->CentreonLogAction->insertLog("service", $maxId["MAX(service_id)"], $hostname." / ".$serviceDescription, "a", $fields);
+                            $centreon->CentreonLogAction->insertLog("service", $maxId["MAX(service_id)"], $serviceDescription, "a", $fields);
                         }
                     }
                 }
@@ -804,14 +804,14 @@ function updateServiceInDB($service_id = null, $from_MC = false, $params = array
     }
 
     $serviceDescription = getMyServiceName($service_id);
-    $hostId = getMyHostServiceID($service_id);
-    $hostname = getMyHostName($hostId);
+    // $hostId = getMyHostServiceID($service_id);
+    // $hostname = getMyHostName($hostId);
     if (isAServiceTpl($service_id)) {
-        $fields["service_host_template"] = $hostname;
+        // $fields["service_host_template"] = $hostname;
         $centreon->CentreonLogAction->insertLog("service template", $service_id, $serviceDescription, $modificationType, $fields);
     } else {
-        $fields["service_hostname"] = $hostname;
-        $centreon->CentreonLogAction->insertLog("service", $service_id, $hostname." / ".$serviceDescription, $modificationType, $fields);;
+        // $fields["service_hostname"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service", $service_id, $serviceDescription, $modificationType, $fields);
     }
 }
 
@@ -836,14 +836,14 @@ function insertServiceInDB($ret = array(), $macro_on_demand = null)
     $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $service_id, "action" => "ADD"));
 
     $serviceDescription = getMyServiceName($service_id);
-    $hostId = getMyHostServiceID($service_id);
-    $hostname = getMyHostName($hostId);
+    // $hostId = getMyHostServiceID($service_id);
+    // $hostname = getMyHostName($hostId);
     if (isAServiceTpl($service_id)) {
-        $fields["service_host_template"] = $hostname;
+        // $fields["service_host_template"] = $hostname;
         $centreon->CentreonLogAction->insertLog("service template", $service_id, $serviceDescription, "a", $fields);
     } else {
-        $fields["service_hostname"] = $hostname;
-        $centreon->CentreonLogAction->insertLog("service", $service_id, $hostname." / ".$serviceDescription, "a", $fields);;
+        // $fields["service_hostname"] = $hostname;
+        $centreon->CentreonLogAction->insertLog("service", $service_id, $serviceDescription, "a", $fields);
     }
 
     return ($service_id);
