@@ -236,17 +236,24 @@ function enableHostInDB($host_id = null, $host_arr = array())
     if ($host_id) {
         $host_arr = array($host_id => "1");
     }
+
     foreach ($host_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE host SET host_activate = '1' WHERE host_id = '" . intval($key) . "'");
-        $DBRESULT2 = $pearDB->query("SELECT host_name FROM `host` WHERE host_id = '" . intval($key) . "' LIMIT 1");
-        $row = $DBRESULT2->fetchRow();
-        $centreon->CentreonLogAction->insertLog("host", $key, $row['host_name'], "enable");
+        
+        $hostname = getMyHostName($key);
+    
+        if (isAHostTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("host template", $key, $hostname, "enable");
+        } else {
+            $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "enable");
+        }
     }
 }
 
 function disableHostInDB($host_id = null, $host_arr = array())
 {
     global $pearDB, $centreon;
+    
     if (!$host_id && !count($host_arr)) {
         return;
     }
@@ -254,11 +261,17 @@ function disableHostInDB($host_id = null, $host_arr = array())
     if ($host_id) {
         $host_arr = array($host_id => "1");
     }
+    
     foreach ($host_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE host SET host_activate = '0' WHERE host_id = '" . intval($key) . "'");
-        $DBRESULT2 = $pearDB->query("SELECT host_name FROM `host` WHERE host_id = '" . intval($key) . "' LIMIT 1");
-        $row = $DBRESULT2->fetchRow();
-        $centreon->CentreonLogAction->insertLog("host", $key, $row['host_name'], "disable");
+        
+        $hostname = getMyHostName($key);
+        
+        if (isAHostTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("host template", $key, $hostname, "disable");
+        } else {
+            $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "disable");
+        }
     }
 }
 
@@ -274,11 +287,9 @@ function deleteHostInDB($hosts = array())
 
         while ($row = $DBRESULT->fetchRow()) {
             if ($row["nbr"] == 1) {
-                $DBRESULT4 = $pearDB->query("SELECT service_description FROM `service` WHERE `service_id` = '" . $row["service_service_id"] . "' LIMIT 1");
-                $svcname = $DBRESULT4->fetchRow();
-
+                $serviceDescription = getMyServiceName($row["service_service_id"]);
                 $DBRESULT2 = $pearDB->query("DELETE FROM service WHERE service_id = '" . $row["service_service_id"] . "'");
-                $centreon->CentreonLogAction->insertLog("service", $row["service_service_id"], $hostname." / ".$svcname["service_description"], "d");
+                $centreon->CentreonLogAction->insertLog("service", $row["service_service_id"], $serviceDescription, "d");
             }
         }
         $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $key, "action" => "DELETE"));
@@ -286,9 +297,15 @@ function deleteHostInDB($hosts = array())
         $DBRESULT = $pearDB->query("DELETE FROM host_template_relation WHERE host_host_id = '" . intval($key) . "'");
         $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_host WHERE host_host_id = '" . intval($key) . "'");
         $DBRESULT = $pearDB->query("DELETE FROM contact_host_relation WHERE host_host_id = '" . intval($key) . "'");
-        $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "d");
+
+        if (isAHostTpl($key)) {
+            $centreon->CentreonLogAction->insertLog("host template", $key, $hostname, "d");
+        } else {
+            $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "d");
+        }
     }
 }
+
 
 /*
  *  This function is called for duplicating a host
@@ -472,6 +489,17 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                     $DBRESULT3 = $pearDB->query($request);
 
                     $centreon->CentreonLogAction->insertLog("host", $maxId["MAX(host_id)"], $host_name, "a", $fields);
+                    
+                    $fields["host_id"] = $service_id["MAX(host_id)"];
+                    $fields = CentreonLogAction::prepareChanges($fields);
+                    
+                    $hostname = getMyHostName($maxId["MAX(host_id)"]);
+                    
+                    if (isAHostTpl($maxId["MAX(host_id)"])) {
+                        $centreon->CentreonLogAction->insertLog("host template", $maxId["MAX(host_id)"], $hostname, "a", $fields);
+                    } else {
+                        $centreon->CentreonLogAction->insertLog("host", $maxId["MAX(host_id)"], $hostname, "a", $fields);
+                    }
                 }
             }
             $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $maxId["MAX(host_id)"], "action" => "DUP", "duplicate_host" => $key));
@@ -658,6 +686,25 @@ function updateHostInDB($host_id = null, $from_MC = false, $cfg = null)
     # 2 - MC with addition of new hg
     # 3 - Normal update
     updateNagiosServerRelation($host_id);
+
+    /*
+     *  Logs
+     */
+    /* Prepare value for changelog */
+    $fields = CentreonLogAction::prepareChanges($ret);
+    $hostname = getMyHostName($host_id);
+
+    $modificationType = "c";
+    if ($from_MC) {
+	    $modificationType = "mc";
+    }
+    
+    if (isAHostTpl($host_id)) {
+        $centreon->CentreonLogAction->insertLog("host template", $host_id, $hostname, $modificationType, $fields);
+    } else {
+        $centreon->CentreonLogAction->insertLog("host", $host_id, $hostname, $modificationType, $fields);
+    }
+
     return ($host_id);
 }
 
@@ -689,6 +736,18 @@ function insertHostInDB($ret = array(), $macro_on_demand = null)
     }
     $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $host_id, "action" => "ADD", "access_grp_id" => $ret["acl_groups"]));
     insertHostExtInfos($host_id, $ret);
+    
+    $ret["host_id"] = $host_id;
+    $fields = CentreonLogAction::prepareChanges($ret);
+                        
+    $hostname = getMyHostName($host_id);
+    
+    if (isAHostTpl($host_id)) {
+        $centreon->CentreonLogAction->insertLog("host template", $host_id, $hostname, "a", $fields);
+    } else {
+        $centreon->CentreonLogAction->insertLog("host", $host_id, $hostname, "a", $fields);
+    }
+
     return ($host_id);
 }
 
@@ -870,10 +929,6 @@ function insertHost($ret, $macro_on_demand = null, $server_id = null)
     /*
      *  Logs
      */
-
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("host", $host_id["MAX(host_id)"], CentreonDB::escape($ret["host_name"]), "a", $fields);
 
     return ($host_id["MAX(host_id)"]);
 }
@@ -1224,12 +1279,6 @@ function updateHost($host_id = null, $from_MC = false, $cfg = null)
         setHostCriticality($host_id, $ret['criticality_id']);
     }
 
-    /*
-     *  Logs
-     */
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("host", $host_id, CentreonDB::escape($ret["host_name"]), "c", $fields);
     $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $host_id, "action" => "UPDATE"));
 }
 

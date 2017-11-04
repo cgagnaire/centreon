@@ -335,9 +335,17 @@ class CentreonLogAction
 
         $uselessKey = array();
         $uselessKey['submitA'] = 1;
+        $uselessKey['submitC'] = 1;
         $uselessKey['o'] = 1;
         $uselessKey['initialValues'] = 1;
         $uselessKey['centreon_token'] = 1;
+        $uselessKey['p'] = 1;
+        $uselessKey['argChecker'] = 1;
+        $uselessKey['macChecker'] = 1;
+        $uselessKey['macroFrom'] = 1;
+        $uselessKey['dupSvTplAssoc'] = 1;
+        $uselessKey['macroTplValToDisplay'] = 1;
+        
 
         if (!isset($ret)) {
             return array();

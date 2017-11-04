@@ -199,37 +199,31 @@ while ($res = $DBRESULT->fetchRow()) {
     if ($res['object_id']) {
         $objectName = str_replace(array('#S#', '#BS#'), array("/", "\\"), $res["object_name"]);
 
-/*        if ($res['object_type'] == "service") {
-            $tmp = $centreon->CentreonLogAction->getHostId($res['object_id']);
-            if ($tmp != -1) {
-                if (isset($tmp['h']) && $tmp['h'] != "Save") {
-                    $tmp2 = $centreon->CentreonLogAction->getHostId($res['object_id']);
-                    $tabHost = split(',', $tmp2["h"]);
-                    if (count($tabHost) == 1) {
-                        $host_name = $centreon->CentreonLogAction->getHostName($tmp2["h"]);
-                    } elseif (count($tabHost) > 1) {
-                        $hosts = array();
-                        foreach ($tabHost as $key => $value) {
-                            $hosts[] = $centreon->CentreonLogAction->getHostName($value);
+        if ($res['object_type'] == "service") {
+            $linkedObjects = $centreon->CentreonLogAction->getHostId($res['object_id']);
+            if ($linkedObjects != -1) {
+                if (isset($linkedObjects['h'])) {
+                    $arrHost = split(',', $linkedObjects["h"]);
+                    if (count($arrHost) == 1) {
+                        $uniqueObject = $centreon->CentreonLogAction->getHostName($linkedObjects["h"]);
+                    } elseif (count($arrHost) > 1) {
+                        $multipleObjects = array();
+                        foreach ($arrHost as $key => $value) {
+                            $multipleObjects[] = $centreon->CentreonLogAction->getHostName($value);
                         }
                     }
-                } elseif (isset($tmp['hg'])) {
-                    $tmp2 = $centreon->CentreonLogAction->getHostId($res['object_id']);
-                    $tabHost = split(',', $tmp2["hg"]);
-                    if (count($tabHost) == 1) {
-                        $hg_name = $centreon->CentreonLogAction->getHostGroupName($tmp2["hg"]);
-                    } elseif (count($tabHost) > 1) {
-                        $hostgroups = array();
-                        foreach ($tabHost as $key => $value) {
-                            $hostgroups[] = $centreon->CentreonLogAction->getHostGroupName($value);
+                } elseif (isset($linkedObjects['hg'])) {
+                    $arrHostgroup = split(',', $linkedObjects["hg"]);
+                    if (count($arrHostgroup) == 1) {
+                        $uniqueObject = $centreon->CentreonLogAction->getHostGroupName($linkedObjects["hg"]);
+                    } elseif (count($arrHostgroup) > 1) {
+                        $multipleObjects = array();
+                        foreach ($arrHostgroup as $key => $value) {
+                            $multipleObjects[] = $centreon->CentreonLogAction->getHostGroupName($value);
                         }
                     }
                 }
-            }
-        }
 
-        if ($res['object_type'] == "service") {
-            if (isset($host_name) && $host_name != '') {
                 $elemArray[] = array(
                     "date" => date('Y/m/d H:i:s', $res['action_log_date']),
                     "type" => $res['object_type'],
@@ -239,54 +233,15 @@ while ($res = $DBRESULT->fetchRow()) {
                     "modification_type" => $tabAction[$res['action_type']],
                     "author" => $contactList[$res['log_contact_id']],
                     "change" => $tabAction[$res['action_type']],
-                    "host" => $host_name,
+                    "uniqueObject" => $uniqueObject,
+                    "multipleObjects" => $multipleObjects,
                     "badge" => $badge[$tabAction[$res['action_type']]]
                 );
-            } elseif (isset($hosts) && count($hosts) != 1) {
-                $elemArray[] = array(
-                    "date" => date('Y/m/d H:i:s', $res['action_log_date']),
-                    "type" => $res['object_type'],
-                    "object_name" => $objectName,
-                    "action_log_id" => $res['action_log_id'],
-                    "object_id" => $res['object_id'],
-                    "modification_type" => $tabAction[$res['action_type']],
-                    "author" => $contactList[$res['log_contact_id']],
-                    "change" => $tabAction[$res['action_type']],
-                    "hosts" => $hosts,
-                    "badge" => $badge[$tabAction[$res['action_type']]]
-                );
-            } elseif (isset($hg_name) && $hg_name != '') {
-                $elemArray[] = array(
-                    "date" => date('Y/m/d H:i:s', $res['action_log_date']),
-                    "type" => $res['object_type'],
-                    "object_name" => $objectName,
-                    "action_log_id" => $res['action_log_id'],
-                    "object_id" => $res['object_id'],
-                    "modification_type" => $tabAction[$res['action_type']],
-                    "author" => $contactList[$res['log_contact_id']],
-                    "change" => $tabAction[$res['action_type']],
-                    "hostgroup" => $hg_name,
-                    "badge" => $badge[$tabAction[$res['action_type']]]
-                );
-            } elseif (isset($hostgroups) && count($hostgroups) != 1) {
-                $elemArray[] = array(
-                    "date" => date('Y/m/d H:i:s', $res['action_log_date']),
-                    "type" => $res['object_type'],
-                    "object_name" => $objectName,
-                    "action_log_id" => $res['action_log_id'],
-                    "object_id" => $res['object_id'],
-                    "modification_type" => $tabAction[$res['action_type']],
-                    "author" => $contactList[$res['log_contact_id']],
-                    "change" => $tabAction[$res['action_type']],
-                    "hostgroups" => $hostgroups,
-                    "badge" => $badge[$tabAction[$res['action_type']]]
-                );
+                
+                unset($uniqueObject);
+                unset($multipleObjects);
             }
-            unset($host_name);
-            unset($hg_name);
-            unset($hosts);
-            unset($hostgroups);
-        } else { */
+        } else {
             $elemArray[] = array(
                 "date" => date('Y/m/d H:i:s', $res['action_log_date']),
                 "type" => $res['object_type'],
@@ -298,7 +253,7 @@ while ($res = $DBRESULT->fetchRow()) {
                 "change" => $tabAction[$res['action_type']],
                 "badge" => $badge[$tabAction[$res['action_type']]]
             );
-        //}
+        }
     }
 }
 

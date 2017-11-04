@@ -232,7 +232,23 @@ function isAHostTpl($host_id = null)
     }
     $DBRESULT = $pearDB->query("SELECT host_register FROM host WHERE host_id = '" . CentreonDB::escape($host_id) . "' LIMIT 1");
     $row = $DBRESULT->fetchRow();
-    if ($row["host_register"] == 1) {
+    if ($row["host_register"] == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function isAServiceTpl($service_id = null)
+{
+    global $pearDB;
+
+    if (!$service_id) {
+        return;
+    }
+    $DBRESULT = $pearDB->query("SELECT service_register FROM service WHERE service_id = '" . CentreonDB::escape($service_id) . "' LIMIT 1");
+    $row = $DBRESULT->fetchRow();
+    if ($row["service_register"] == 0) {
         return true;
     } else {
         return false;

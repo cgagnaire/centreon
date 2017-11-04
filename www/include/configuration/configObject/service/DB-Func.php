@@ -301,15 +301,19 @@ function getServiceIdByCombination($serviceDescription, $hPars = array(), $hgPar
 
 function enableServiceInDB($service_id = null, $service_arr = array())
 {
+    global $pearDB, $centreon;
+
     if (!$service_id && !count($service_arr)) {
         return;
     }
-    global $pearDB, $centreon;
+
     if ($service_id) {
         $service_arr = array($service_id=>"1");
     }
+
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '1' WHERE service_id = '".$key."'");
+    
         $serviceDescription = getMyServiceName($key);
         // $hostId = getMyHostServiceID($key);
         // $hostname = getMyHostName($hostId);
@@ -323,13 +327,16 @@ function enableServiceInDB($service_id = null, $service_arr = array())
 
 function disableServiceInDB($service_id = null, $service_arr = array())
 {
+    global $pearDB, $centreon;
+
     if (!$service_id && !count($service_arr)) {
         return;
     }
-    global $pearDB, $centreon;
+    
     if ($service_id) {
         $service_arr = array($service_id=>"1");
     }
+
     foreach ($service_arr as $key => $value) {
         $DBRESULT = $pearDB->query("UPDATE service SET service_activate = '0' WHERE service_id = '".$key."'");
         $serviceDescription = getMyServiceName($key);
@@ -515,6 +522,7 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
                         } elseif ($hostgroup) {
                             $pearDB->query("INSERT INTO host_service_relation VALUES ('', '".$hostgroup."', NULL, NULL, '".$maxId["MAX(service_id)"]."')");
                             setHostChangeFlag($pearDB, null, $hostgroup);
+                            $fields["service_hgPars"] = $hostgroup;
                         } else {
                             // Service duplication case -> Duplicate the Service for each relation the base Service have
                             $DBRESULT = $pearDB->query("SELECT DISTINCT host_host_id, hostgroup_hg_id FROM host_service_relation WHERE service_service_id = '".$key."'");
@@ -641,14 +649,17 @@ function multipleServiceInDB($services = array(), $nbrDup = array(), $host = nul
                         /*
                          *  get svc desc
                          */
-			            $serviceDescription = getMyServiceName($maxId["MAX(service_id)"]);
+                        $fields["service_id"] = $service_id["MAX(service_id)"];
+                        $fields = CentreonLogAction::prepareChanges($fields);
+                        
+                        $serviceDescription = getMyServiceName($maxId["MAX(service_id)"]);
                         // $hostId = getMyHostServiceID($maxId["MAX(service_id)"]);
                         // $hostname = getMyHostName($hostId);
                         if (isAServiceTpl($key)) {
-			                $fields["service_host_template"] = $hostname;
+			                // $fields["service_host_template"] = $hostname;
                             $centreon->CentreonLogAction->insertLog("service template", $maxId["MAX(service_id)"], $serviceDescription, "a", $fields);
                         } else {
-			                $fields["service_hostname"] = $hostname;
+			                // $fields["service_hostname"] = $hostname;
                             $centreon->CentreonLogAction->insertLog("service", $maxId["MAX(service_id)"], $serviceDescription, "a", $fields);
                         }
                     }
@@ -835,6 +846,9 @@ function insertServiceInDB($ret = array(), $macro_on_demand = null)
     updateServiceCategories($service_id, $ret);
     $centreon->user->access->updateACL(array("type" => 'SERVICE', 'id' => $service_id, "action" => "ADD"));
 
+    $fields["service_id"] = $service_id;
+    $fields = CentreonLogAction::prepareChanges($fields);
+
     $serviceDescription = getMyServiceName($service_id);
     // $hostId = getMyHostServiceID($service_id);
     // $hostname = getMyHostName($hostId);
@@ -971,7 +985,9 @@ function insertService($ret = array(), $macro_on_demand = null)
         setServiceCriticality($service_id['MAX(service_id)'], $ret['criticality_id']);
     }
 
-    return (array("service_id" => $service_id["MAX(service_id)"], "fields" => $fields));
+    $ret["service_id"] = $service_id["MAX(service_id)"];
+
+    return (array("service_id" => $service_id["MAX(service_id)"], "fields" => $ret));
 }
 
 function insertServiceExtInfos($service_id = null, $ret)
