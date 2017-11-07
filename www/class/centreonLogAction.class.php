@@ -346,7 +346,6 @@ class CentreonLogAction
         $uselessKey['dupSvTplAssoc'] = 1;
         $uselessKey['macroTplValToDisplay'] = 1;
         
-
         if (!isset($ret)) {
             return array();
         } else {
