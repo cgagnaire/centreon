@@ -207,7 +207,7 @@ class CentreonLogAction
             return $info['host_name'];
         }
 
-        $query = "SELECT object_id, object_name FROM log_action WHERE object_type = 'service' AND object_id = $host_id";
+        $query = "SELECT object_id, object_name FROM log_action WHERE object_type = 'host' AND object_id = $host_id";
         $DBRESULT2 = $pearDBO->query($query);
         $info = $DBRESULT2->fetchRow();
         if (isset($info['object_name'])) {
@@ -227,7 +227,7 @@ class CentreonLogAction
             return $info['hg_name'];
         }
 
-        $query = "SELECT object_id, object_name FROM log_action WHERE object_type = 'service' AND object_id = $hg_id";
+        $query = "SELECT object_id, object_name FROM log_action WHERE object_type = 'host group' AND object_id = $hg_id";
         $DBRESULT2 = $pearDBO->query($query);
         $info = $DBRESULT2->fetchRow();
         if (isset($info['object_name'])) {
@@ -333,37 +333,46 @@ class CentreonLogAction
     {
         global $pearDB;
 
-        $uselessKey = array();
-        $uselessKey['submitA'] = 1;
-        $uselessKey['submitC'] = 1;
-        $uselessKey['o'] = 1;
-        $uselessKey['initialValues'] = 1;
-        $uselessKey['centreon_token'] = 1;
-        $uselessKey['p'] = 1;
-        $uselessKey['argChecker'] = 1;
-        $uselessKey['macChecker'] = 1;
-        $uselessKey['macroFrom'] = 1;
-        $uselessKey['dupSvTplAssoc'] = 1;
-        $uselessKey['macroTplValToDisplay'] = 1;
-        
+        $uselessKey[1] = "^submit.*";
+        $uselessKey[2] = "^o$";
+        $uselessKey[3] = "^p$";
+        $uselessKey[4] = "initialValues";
+        $uselessKey[5] = "centreon_token";
+        $uselessKey[6] = "argChecker";
+        $uselessKey[7] = "macChecker";
+        $uselessKey[8] = "macroFrom";
+        $uselessKey[9] = "dupSvTplAssoc";
+        $uselessKey[10] = "tpSelect";
+        $uselessKey[11] = "macroInput";
+        $uselessKey[12] = "macroValue";
+        $uselessKey[13] = "macroTplValToDisplay_.*";
+        $uselessKey[14] = "macroTpl_.*";
+        $uselessKey[15] = "macroTplValue_.*";
+        $uselessKey[16] = "macroOldValue_.*";
+        $uselessKey[17] = "isFrozen_.*";
+        $uselessKey[18] = "clone_order_template_.*";
+        $uselessKey[19] = "host_stalOpts";
+
+        $uselessKeys = implode("|", $uselessKey);
+                
         if (!isset($ret)) {
             return array();
         } else {
-            $info = array();
+            $fields = array();
             foreach ($ret as $key => $value) {
-                if (!isset($uselessKey[trim($key)])) {
+                if (!preg_match('/'.$uselessKeys.'/', $key)) {
                     if (is_array($value)) {
                         if (isset($value[$key])) {
-                            $info[$key] = $value[$key];
+                            $fields[$key] = $value[$key];
                         } else {
-                            $info[$key] = implode(",", $value);
+                            $fields[$key] = implode(",", $value);
                         }
                     } else {
-                        $info[$key] = CentreonDB::escape($value);
+                        $fields[$key] = CentreonDB::escape($value);
                     }
                 }
             }
         }
-        return $info;
+        return $fields;
     }
 }

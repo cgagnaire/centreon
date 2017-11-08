@@ -292,17 +292,18 @@ function deleteHostInDB($hosts = array())
                 $centreon->CentreonLogAction->insertLog("service", $row["service_service_id"], $serviceDescription, "d");
             }
         }
-        $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $key, "action" => "DELETE"));
-        $DBRESULT = $pearDB->query("DELETE FROM host WHERE host_id = '" . intval($key) . "'");
-        $DBRESULT = $pearDB->query("DELETE FROM host_template_relation WHERE host_host_id = '" . intval($key) . "'");
-        $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_host WHERE host_host_id = '" . intval($key) . "'");
-        $DBRESULT = $pearDB->query("DELETE FROM contact_host_relation WHERE host_host_id = '" . intval($key) . "'");
 
         if (isAHostTpl($key)) {
             $centreon->CentreonLogAction->insertLog("host template", $key, $hostname, "d");
         } else {
             $centreon->CentreonLogAction->insertLog("host", $key, $hostname, "d");
         }
+
+        $centreon->user->access->updateACL(array("type" => 'HOST', 'id' => $key, "action" => "DELETE"));
+        $DBRESULT = $pearDB->query("DELETE FROM host WHERE host_id = '" . intval($key) . "'");
+        $DBRESULT = $pearDB->query("DELETE FROM host_template_relation WHERE host_host_id = '" . intval($key) . "'");
+        $DBRESULT = $pearDB->query("DELETE FROM on_demand_macro_host WHERE host_host_id = '" . intval($key) . "'");
+        $DBRESULT = $pearDB->query("DELETE FROM contact_host_relation WHERE host_host_id = '" . intval($key) . "'");
     }
 }
 
@@ -386,7 +387,9 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                         $DBRESULT = $pearDB->query("SELECT DISTINCT service_service_id FROM host_service_relation WHERE host_host_id = '" . intval($key) . "'");
                         while ($svs = $DBRESULT->fetchRow()) {
                             $DBRESULT1 = $pearDB->query("INSERT INTO host_service_relation VALUES ('', NULL, '" . $maxId["MAX(host_id)"] . "', NULL, '" . $svs["service_service_id"] . "')");
+                            $fields["host_svTpls"] .= $svs["service_service_id"] . ",";
                         }
+                        $fields["host_svTpls"] = trim($fields["host_svTpls"], ",");
                     }
 
                     /*
@@ -449,7 +452,7 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                     $fields["nagios_server_id"] = trim($fields["nagios_server_id"], ",");
 
                     /*
-                     *  multiple templates & on demand macros
+                     *  multiple templates
                      */
                     $mTpRq1 = "SELECT * FROM `host_template_relation` WHERE `host_host_id` ='" . intval($key) . "' ORDER BY `order`";
                     $DBRESULT3 = $pearDB->query($mTpRq1);
@@ -463,7 +466,7 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                         }
                     }
                     $multiTP_logStr = trim($multiTP_logStr, ",");
-                    $fields["templates"] = $multiTP_logStr;
+                    $fields["host_tpl_id"] = $multiTP_logStr;
 
                     /*
                      * on demand macros
@@ -479,7 +482,7 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                         $mTpRq2 = "INSERT INTO `on_demand_macro_host` (`host_host_id`, `host_macro_name`, `host_macro_value`, `is_password`) VALUES" .
                                 "('" . $maxId["MAX(host_id)"] . "', '\$" . $pearDB->escape($macName) . "\$', '" . $pearDB->escape($macVal) . "', '" . $pearDB->escape($hst["is_password"]) . "')";
                         $DBRESULT4 = $pearDB->query($mTpRq2);
-                        $fields["_" . strtoupper($macName) . "_"] = $macVal;
+                        $fields[str_replace("_HOST", "", strtoupper($macName))] = $macVal;
                     }
 
                     /*
@@ -488,13 +491,10 @@ function multipleHostInDB($hosts = array(), $nbrDup = array())
                     $request = "INSERT INTO hostcategories_relation SELECT NULL, hostcategories_hc_id, '" . $maxId["MAX(host_id)"] . "' FROM hostcategories_relation WHERE host_host_id = '" . intval($key) . "'";
                     $DBRESULT3 = $pearDB->query($request);
 
-                    $centreon->CentreonLogAction->insertLog("host", $maxId["MAX(host_id)"], $host_name, "a", $fields);
-                    
-                    $fields["host_id"] = $service_id["MAX(host_id)"];
+                    $fields["host_id"] = $maxId["MAX(host_id)"];
                     $fields = CentreonLogAction::prepareChanges($fields);
                     
                     $hostname = getMyHostName($maxId["MAX(host_id)"]);
-                    
                     if (isAHostTpl($maxId["MAX(host_id)"])) {
                         $centreon->CentreonLogAction->insertLog("host template", $maxId["MAX(host_id)"], $hostname, "a", $fields);
                     } else {
@@ -881,7 +881,7 @@ function insertHost($ret, $macro_on_demand = null, $server_id = null)
                     $macVal = $my_tab[$macValue];
                     $rq = "INSERT INTO on_demand_macro_host (`host_macro_name`, `host_macro_value`, `description`, `host_host_id`, `macro_order`) VALUES ('\$_HOST" . strtoupper($macName) . "\$', '" . CentreonDB::escape($macVal) . "', " . $host_id['MAX(host_id)'] . ", " . $i . ")";
                     $DBRESULT = $pearDB->query($rq);
-                    $fields["_" . strtoupper($my_tab[$macInput]) . "_"] = $my_tab[$macValue];
+                    $ret[strtoupper($my_tab[$macInput])] = $my_tab[$macValue];
                     $already_stored[strtolower($my_tab[$macInput])] = 1;
                 }
             }
@@ -926,9 +926,6 @@ function insertHost($ret, $macro_on_demand = null, $server_id = null)
             $pearDB->query($sql);
         }
     }
-    /*
-     *  Logs
-     */
 
     return ($host_id["MAX(host_id)"]);
 }
@@ -1462,10 +1459,6 @@ function updateHost_MC($host_id = null)
 
     $DBRESULTX = $pearDB->query("SELECT host_name FROM `host` WHERE host_id='" . $host_id . "' LIMIT 1");
     $row = $DBRESULTX->fetchRow();
-
-    /* Prepare value for changelog */
-    $fields = CentreonLogAction::prepareChanges($ret);
-    $centreon->CentreonLogAction->insertLog("host", $host_id, $row["host_name"], "mc", $fields);
 }
 
 function updateHostHostParent($host_id = null, $ret = array())
