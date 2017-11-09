@@ -881,7 +881,7 @@ function insertHost($ret, $macro_on_demand = null, $server_id = null)
                     $macVal = $my_tab[$macValue];
                     $rq = "INSERT INTO on_demand_macro_host (`host_macro_name`, `host_macro_value`, `description`, `host_host_id`, `macro_order`) VALUES ('\$_HOST" . strtoupper($macName) . "\$', '" . CentreonDB::escape($macVal) . "', " . $host_id['MAX(host_id)'] . ", " . $i . ")";
                     $DBRESULT = $pearDB->query($rq);
-                    $ret[strtoupper($my_tab[$macInput])] = $my_tab[$macValue];
+                    $ret[strtoupper($macName) = $macVal;
                     $already_stored[strtolower($my_tab[$macInput])] = 1;
                 }
             }

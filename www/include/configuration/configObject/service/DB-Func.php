@@ -956,7 +956,7 @@ function insertService($ret = array(), $macro_on_demand = null)
                     $macVal = $my_tab[$macValue];
                     $rq = "INSERT INTO on_demand_macro_service (`svc_macro_name`, `svc_macro_value`, `svc_svc_id`, `macro_order` ) VALUES ('\$_SERVICE". CentreonDB::escape(strtoupper($macName)) ."\$', '". CentreonDB::escape($macVal) ."', ". $service_id["MAX(service_id)"] .", " . $i . ")";
                     $DBRESULT = $pearDB->query($rq);
-                    $ret[strtoupper($my_tab[$macInput])] = $my_tab[$macValue];
+                    $ret[strtoupper($macName)] = $macValue;
                     $already_stored[strtolower($my_tab[$macInput])] = 1;
                 }
             }
