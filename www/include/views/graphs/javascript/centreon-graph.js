@@ -395,6 +395,20 @@
         }
       }
 
+      if (dataRaw.data.length === 1 && dataRaw.limits.max) {
+        nbPoints = dataRaw.data[0].data.length;
+        data.colors.max = '#484832';
+        data.types.max = 'line';
+        data.names.max = 'Max';
+        thresholdData = Array.apply(null, Array(nbPoints))
+          .map(function () {
+            return numeral(dataRaw.limits.max).value();
+          });
+        thresholdData.unshift('max');
+        data.columns.push(thresholdData);
+        data.regions.max = [{style: 'dashed'}];
+      }
+
       /* Add group */
       data.groups = this.buildGroups(dataRaw);
 
@@ -695,7 +709,7 @@
      */
     isInversed: function (id) {
       var pos = parseInt(id.replace('data', ''), 10) - 1;
-      if (id === 'crit' || id === 'warn') {
+      if (id === 'crit' || id === 'warn' || id === 'max') {
         return false;
       }
       return this.chartData.data[pos].negative;
