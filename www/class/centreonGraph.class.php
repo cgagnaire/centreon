@@ -51,12 +51,6 @@ require_once _CENTREON_PATH_ . "www/include/common/common-Func.php";
  */
 class CentreonGraph
 {
-    /**
-     * Percentage over Max limit
-     *
-     */
-    const OVER_MAX_LIMIT_PCT = 3;
-
     /*
      * Engine infinite values
      */
@@ -309,11 +303,7 @@ class CentreonGraph
         $res = $this->DBC->query($query);
         if ($res->numRows()) {
             $row = $res->fetchRow();
-            $maxlimit = $row['maxlimit'];
-            if ($maxlimit != 0) {
-                $maxlimit = $maxlimit + ((self::OVER_MAX_LIMIT_PCT / $maxlimit) * 100);
-            }
-            return $maxlimit;
+            return $row['maxlimit'];
         }
         return 0;
     }
@@ -1106,9 +1096,18 @@ class CentreonGraph
                 FROM giv_graphs_template
                 WHERE graph_id = '" . $this->templateId . "' LIMIT 1"
         );
-        $this->templateInformations = $DBRESULT->fetchRow();
-        $DBRESULT->free();
 
+        $this->templateInformations = $DBRESULT->fetchRow();
+
+        if (isset($this->templateInformations["size_to_max"]) && $this->templateInformations["size_to_max"]) {
+            if ($this->onecurve === true) {
+                $this->templateInformations["upper_limit"] = $this->getMaxLimit($this->metricsEnabled[0]);
+            } else {
+                $this->templateInformations["upper_limit"] = $this->getMaxLimit();
+            }
+        }
+
+        $DBRESULT->free();
     }
 
     /**
