@@ -24,7 +24,7 @@ class EasyVistaRestProvider extends AbstractProvider
     protected $close_advanced = 1;
     protected $proxy_enabled = 1;
 
-    public const EZV_ASSET_TYPE = 16;
+    public const EZV_CATALOG_CODE = 30;
 
     public const ARG_TITLE = 1;
     public const ARG_URGENCY_ID = 2;
@@ -40,9 +40,9 @@ class EasyVistaRestProvider extends AbstractProvider
     public const ARG_LOCATION_CODE = 12;
     public const ARG_CATALOG_GUID = 13;
     public const ARG_CATALOG_CODE = 14;
-    public const ARG_CUSTOM_EZV = 15;
+    public const ARG_GROUP = 15;
+    public const ARG_CUSTOM_EZV = 16;
     
-
     protected $internal_arg_name = [
         self::ARG_TITLE => 'title',
         self::ARG_URGENCY_ID => 'urgency',
@@ -57,7 +57,9 @@ class EasyVistaRestProvider extends AbstractProvider
         self::ARG_ASSET_NAME => 'asset',
         self::ARG_LOCATION_CODE => 'requester',
         self::ARG_CATALOG_GUID => 'catalog_guid',
-        self::ARG_CATALOG_CODE => 'catalog_code'
+        self::ARG_CATALOG_CODE => 'catalog_code',
+        self::ARG_GROUP => 'group',
+        self::ARG_CUSTOM_EZV => 'custom_ezv'
     ];  
 
     /*
@@ -132,6 +134,10 @@ class EasyVistaRestProvider extends AbstractProvider
             [
                 'Arg' => self::ARG_CATALOG_CODE,
                 'Value' => '{$select.ezv_catalog_code.id}'
+            ],
+            [
+                'Arg' => self::ARG_GROUP,
+                'Value' => '{$select.ezv_group.value}'
             ]
         ];
     }
@@ -158,33 +164,9 @@ class EasyVistaRestProvider extends AbstractProvider
             <textarea id="custom_message" name="custom_message" cols="50" rows="6"></textarea>
         </td>
     </tr>
-    <tr>
-        <td class="FormRowField" style="padding-left:15px;">Use hostgroup name as CI</td>
-        <td class="FormRowField" style="padding-left:15px;"><input id="ci_type_selector" type="checkbox"></input></td>
-    </tr>
-    </tr>
     {include file="file:$centreon_open_tickets_path/providers/Abstract/templates/groups.ihtml"}
     {include file="file:$centreon_open_tickets_path/providers/EasyVistaRest/templates/handle_ci.ihtml"}
 </table>';
-
-        // $this->default_data['clones']['groupList'] = [
-        //     [
-        //         'Id' => 'ezv_asset_name',
-        //         'Label' => _('Assets'),
-        //         'Type' => self::EZV_ASSET_TYPE,
-        //         'Filter' => '',
-        //         'Mandatory' => ''
-        //     ]
-        // ];
-
-        // $this->default_data['clones']['customList'] = [
-        //     [
-        //         'Id' => 'ezv_origin',
-        //         'Value' => '1',
-        //         'Label' => 'Very Low',
-        //         'Default' => ''
-        //     ]
-        // ];
     }
 
     /*
@@ -234,14 +216,14 @@ class EasyVistaRestProvider extends AbstractProvider
             $this->getFormValue('address') . '" />';
         $api_path_html = '<input size="50" name="api_path" type="text" value="' .
             $this->getFormValue('api_path') . '" />';
-        $protocol_html = '<input size="50" name="protocol" type="text" value="' .
-            $this->getFormValue('protocol') . '" />';
         $account_html = '<input size="50" name="account" type="text" value="' .
             $this->getFormValue('account') . '" autocomplete="off" />';
         $token_html = '<input size="50" name="token" type="token" value="' .
             $this->getFormValue('token') . '" autocomplete="off" />';
-        $timeout_html = '<input size="50" name="timeout" type="text" value="' .
-            $this->getFormValue('timeout') . '" :>';
+        $protocol_html = '<input size="2" name="protocol" type="text" value="' .
+            $this->getFormValue('protocol') . '" />';
+        $timeout_html = '<input size="2" name="timeout" type="text" value="' .
+            $this->getFormValue('timeout') . '" />';
         $use_token_html = '<input size="50" name="use_token" type="text" value="' .
             $this->getFormValue('use_token') . '" :>';
 
@@ -302,6 +284,7 @@ class EasyVistaRestProvider extends AbstractProvider
             '<option value="' . self::ARG_LOCATION_CODE . '">' . _('Location') . '</option>' .
             '<option value="' . self::ARG_CATALOG_GUID . '">' . _('Catalog GUID') . '</option>' .
             '<option value="' . self::ARG_CATALOG_CODE . '">' . _('Catalog code') . '</option>' .
+            '<option value="' . self::ARG_GROUP . '">' . _('Group') . '</option>' .
             '<option value="' . self::ARG_CUSTOM_EZV . '">' ._('Custom Field') . '</option>' .
             '</select>';
 
@@ -352,35 +335,26 @@ class EasyVistaRestProvider extends AbstractProvider
     */
     protected function getGroupListOptions()
     {
-        $str = '<option value="' . self::EZV_ASSET_TYPE . '">Asset</option>';
+        $str = '<option value="' . self::EZV_CATALOG_CODE . '">Catalog code</option>';
 
         return $str;
     }
 
     protected function assignOthers($entry, &$groups_order, &$groups)
     {
-        if ($entry['Type'] == self::EZV_ASSET_TYPE) {
-            $this->assignEzvAssets($entry, $groups_order, $groups);
+        if ($entry['Type'] == self::EZV_CATALOG_CODE) {
+            $this->assignEzvCatalogCode($entry, $groups_order, $groups);
         }
     }
 
-    protected function assignEzvAssets($entry, &$groups_order, &$groups)
+    protected function assignEzvCatalogCode($entry, &$groups_order, &$groups)
     {
-        // add a label to our entry and activate sorting or not.
-        $groups[$entry['Id']] = array(
-            'label' => _($entry['Label']) .
-            (isset($entry['Mandatory']) && $entry['Mandatory'] == 1 ? $this->required_field : '' ),
-            'sort' => (isset($entry['Sort']) && $entry['Sort'] == 1 ? 1 : 0)
-        );
-        // adds our entry in the group order array
-        $groups_order[] = $entry['Id'];
-
-        // try to get entities
+        // try to get catalogs
         try {
-            $listAssets = $this->getCache($entry['Id']);
-            if (is_null($listAssets)) {
-                $listAssets = $this->getAssets($entry['Filter']);
-                $this->setCache($entry['Id'], $listAssets, 8 * 3600);
+            $listCatalogCodes = $this->getCache($entry['Id']);
+            if (is_null($listCatalogCodes)) {
+                $listCatalogCodes = $this->getCatalogCodes($entry['Filter']);
+                $this->setCache($entry['Id'], $listCatalogCodes, 8 * 3600);
             }
         } catch (\Exception $e) {
             $groups[$entry['Id']]['code'] = -1;
@@ -388,19 +362,29 @@ class EasyVistaRestProvider extends AbstractProvider
         }
         $result = array();
 
-        foreach ($listAssets['records'] as $asset) {
-            // HREF structure is the following: https://{your_server}/api/v1/{your_account}/assets/9478 we only keep id
-            preg_match('/.*\/([0-9]+)$/', $asset['HREF'], $match);
-            $result[$match[1]] = $this->to_utf8($asset['ASSET_TAG']);
-        }
-
-        $groups[$entry['Id']]['values'] = $result;
+        foreach ($listCatalogCodes['records'] as $catalog) {
+            if (!empty($catalog['CODE']) and !empty($catalog['CATALOG_REQUEST_PATH']) ) {
+                $result[$catalog['CODE']] = $this->to_utf8($catalog['CATALOG_REQUEST_PATH']);
+                $placeholder[$catalog['CODE']] = $this->to_utf8($catalog['CATALOG_REQUEST_PATH']);
+            }
+        }        
+        
+        $groups[$entry['Id']] = [
+            'label' => _($entry['Label']) . (
+                isset($entry['Mandatory']) && $entry['Mandatory'] == 1 ? $this->required_field : ''
+            ),
+            'values' => $result,
+            'placeholder' => $placeholder,
+            'default' => '',
+            'sort' => (isset($entry['Sort']) && $entry['Sort'] == 1 ? 1 : 0)
+        ];
+        $groups_order[] = $entry['Id'];
     }
 
-    protected function getAssets($filter)
+    protected function getCatalogCodes($filter)
     {
         // add the api endpoint and method to our info array
-        $info['query_endpoint'] = '/assets?fields=asset_tag,HREF';
+        $info['query_endpoint'] = '/catalog-requests?fields=CATALOG_REQUEST_PATH,CODE&max_rows=500';
         
         if (!empty($filter)) {
             $info['query_endpoint'] .= "&" . $filter;
@@ -411,7 +395,7 @@ class EasyVistaRestProvider extends AbstractProvider
         // try to get assets from ezv
         try {
             // the variable is going to be used outside of this method.
-            $result= $this->curlQuery($info);
+            $result = $this->curlQuery($info);
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage(), $e->getCode());
         }
@@ -466,6 +450,7 @@ class EasyVistaRestProvider extends AbstractProvider
         $tpl->assign('user', $contact);
         $tpl->assign('host_selected', $host_problems);
         $tpl->assign('service_selected', $service_problems);
+
         // assign submitted values from the widget to the template
         $this->assignSubmittedValues($tpl);
 
@@ -491,6 +476,14 @@ class EasyVistaRestProvider extends AbstractProvider
         // we try to open the ticket
         try {
             $ticketId = $this->createTicket($ticketArguments);
+        } catch (\Exception $e) {
+            $result['ticket_error_message'] = $e->getMessage();
+            return $result;
+        }
+
+        // we update action
+        try {
+            $this->updateAction($ticketId, $ticketArguments[$this->internal_arg_name[self::ARG_GROUP]]);
         } catch (\Exception $e) {
             $result['ticket_error_message'] = $e->getMessage();
             return $result;
@@ -596,19 +589,25 @@ class EasyVistaRestProvider extends AbstractProvider
 
     protected function createTicket($ticketArguments)
     {
-        // $file = fopen("/var/log/php-fpm/ezv", "a") or die ("Unable to open file!");
         // add the api endpoint and method to our info array
         $info['query_endpoint'] = '/requests';
         $info['method'] = "POST";
-        $info['data'] = [
-            'requests' => [
-                [
-                    'catalog_guid' => $ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_GUID]],
-                    'catalog_code' => $ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_CODE]],
-                    'title' => $ticketArguments[$this->internal_arg_name[self::ARG_TITLE]]
-                ]
-            ]
-        ];
+
+        if (!empty($ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_GUID]])) {
+            $info['data']['requests'][0]['catalog_guid'] = $ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_GUID]];
+        }
+
+        if (!empty($ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_CODE]])) {
+            $info['data']['requests'][0]['catalog_code'] = $ticketArguments[$this->internal_arg_name[self::ARG_CATALOG_CODE]];
+        }
+
+        if (!empty($ticketArguments[$this->internal_arg_name[self::ARG_GROUP]])) {
+            $info['data']['requests'][0]['owning_group_id'] = $ticketArguments[$this->internal_arg_name[self::ARG_GROUP]];
+        }
+
+        if (!empty($ticketArguments[$this->internal_arg_name[self::ARG_TITLE]])) {
+            $info['data']['requests'][0]['title'] = $ticketArguments[$this->internal_arg_name[self::ARG_TITLE]];
+        }
 
         if (!empty($ticketArguments[$this->internal_arg_name[self::ARG_ASSET_NAME]])) {
             $info['data']['requests'][0]['asset_name'] = $ticketArguments[$this->internal_arg_name[self::ARG_ASSET_NAME]];
@@ -655,34 +654,67 @@ class EasyVistaRestProvider extends AbstractProvider
         }
 
         foreach ($ticketArguments as $id => $value) {
-            // $id is structure is "{$select.e_my_custom_field_name.value}" we keep "e_my_custom_field_name"
+            // $id structure is "{$select.e_my_custom_field_name.value}" we keep "e_my_custom_field_name"
             if (preg_match('/.*\.(e_.*)\.[id|value|placeholder].*/', $id, $match)) {
                 $info['data']['requests'][0][$match[1]] = $value;
             }
         }
 
-//         fwrite($file, print_r("\n ticketargs \n",true));
-//         fwrite($file, print_r($ticketArguments,true));
+        $info['data']['requests'][0]['AVAILABLE_FIELD_6'] = "Information Technology";
         
-// fwrite($file, print_r("\n info \n",true));
-// fwrite($file, print_r(json_encode($info['data']),true));
         $result=$this->curlQuery($info);
         preg_match('~' . $this->getFormValue('address') . $this->getFormValue('api_path') . $info['query_endpoint'] . '/(.*)$~', $result['HREF'], $match);
         $ticketId=$match[1];
-// fclose($file);
 
-        // return 1234;
         return $ticketId;
+    }
+
+    protected function getActionId($ticketId)
+    {
+        // add the api endpoint and method to our info array
+        $info['query_endpoint'] = '/actions?fields=ACTION_ID&search=REQUEST.RFC_NUMBER=' . $ticketId . ',ACTION_TYPE_ID=34&max_rows=1';
+        $info['method'] = "GET";
+
+        $result = $this->curlQuery($info);
+
+        $actionId = $result['records'][0]['ACTION_ID'];
+
+        return $actionId;
+    }
+
+    protected function updateAction($ticketId, $groupId)
+    {
+        try {
+            $actionId = $this->getActionId($ticketId);
+        } catch (\Exception $e) {
+            $result['ticket_error_message'] = $e->getMessage();
+            return $result;
+        }
+
+        // add the api endpoint and method to our info array
+        $info['query_endpoint'] = '/actions/' . $actionId;
+        $info['method'] = 'PUT';
+        $info['custom_request'] = 'PUT';
+        $info['data'] = [
+            'GROUP_ID' => $groupId,
+            'DONE_BY_ID' => 'null'
+        ];
+
+        $result = $this->curlQuery($info);
+
+        return 0;
     }
 
     protected function closeTicketEzv($ticketId)
     {
         // add the api endpoint and method to our info array
         $info['query_endpoint'] = '/requests/' . $ticketId;
-        $info['method'] = 0;
+        $info['method'] = 'PUT';
         $info['custom_request'] = 'PUT';
         $info['data'] = [
-            'closed' => []
+            'closed' => [
+                "comment" => "Closed via Centreon"
+            ]
         ];
 
         try {
